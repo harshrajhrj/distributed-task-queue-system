@@ -23,15 +23,18 @@ distributed-task-queue/
     └── src/
         └── App.js
 ```
-### Workflow
+
+### Architecture/Workflow
 The data flow look like this:
-#### Frontend (React): The user submits a number via a web form.
+#### Frontend (React): The user submits a task via a web form.
+The process begins when the user enters a number into the web UI and clicks the "Calculate" button.
+
 ```
-              +--------------------+
-              |                    |
-[👨‍💻 User] --> |  React Frontend    |
-              |   (localhost:3000) |
-              +--------------------+
+              +-------------------+
+              |                   |
+[👨‍💻 User] --> |   React Frontend  |
+              |  (localhost:3000) |
+              +-------------------+
                   |
                   | 1. HTTP POST Request
                   |    (e.g., {"number": 35})
@@ -39,6 +42,11 @@ The data flow look like this:
 ```
 
 #### Manager (Flask): Receives the request, generates a unique Task ID, and pushes a message { "id": "...", "number": "..." } to RabbitMQ. It immediately returns the Task ID to the frontend.
+- The Manager (Flask API) receives the request.
+- It generates a unique Task ID (e.g., abc-123).
+- It immediately sends this Task ID back to the frontend.
+- Crucially, it pushes the task (with its ID and the number) onto the task_queue in RabbitMQ.
+
 ```
             +-----------------+      +------------------+
             |  Flask Manager  |      |                  |
@@ -58,6 +66,10 @@ The data flow look like this:
 ```
 
 #### Worker: Picks up the task from RabbitMQ, calculates the result.
+- One of the available, idle Worker containers is listening to the queue.
+- It immediately grabs the new task message.
+- It performs the heavy computation (the Fibonacci calculation).
+
 ```
                              +------------------+
                              |                  |
@@ -79,7 +91,11 @@ The data flow look like this:
                              |     (9227465)    |
                              +------------------+
 ```
+
 #### Worker to Redis: The worker stores the result in Redis using the Task ID as the key.
+- Once the calculation is done, the worker connects to the Redis cache.
+- It stores the result using the unique Task ID as the key.
+
 ```
          +------------------+      +-------------------+
          |  Python Worker   |      |                   |
@@ -92,6 +108,12 @@ The data flow look like this:
 ```
 
 #### Frontend to Manager: The frontend periodically asks the Manager ("polls") for the result of its Task ID.
+- Meanwhile, the React Frontend has been periodically asking (polling) the Manager's `/task/<task_id>` endpoint for an update.
+- Initially, the Manager would have found nothing in Redis and told the frontend the status was still "pending".
+- Once the worker stores the result in Redis, the Manager's next check is successful.
+- The Manager sends the final result back to the frontend.
+- The UI automatically updates to show the task is complete and displays the final number.
+
 ```
     +------------------+      +------------------+      +------------------+
     |  React Frontend  |----->|  Flask Manager   |----->|      Redis       |
