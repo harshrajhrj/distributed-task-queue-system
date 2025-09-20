@@ -32,7 +32,7 @@ The process begins when the user enters a number into the web UI and clicks the 
 ```
               +-------------------+
               |                   |
-[User] --> |   React Frontend  |
+   [User] --> |   React Frontend  |
               |  (localhost:3000) |
               +-------------------+
                   |
